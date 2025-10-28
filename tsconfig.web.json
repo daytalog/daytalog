@@ -1,0 +1,49 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/renderer/src/env.d.ts",
+    "src/renderer/src/**/*",
+    "src/renderer/**/*",
+    "src/renderer/core/src/**/*",
+    "src/renderer/src/**/*.tsx",
+    "src/renderer/core/src/**/*.tsx",
+    "src/preload/**/*.d.ts",
+    "src/shared/**/*.ts",
+    "src/main/core/app-state/state.tsx"
+, "src/shared/core/utils/getAttachments.ts", "src/shared/core/utils/getLatestDaytalog.ts", "src/shared/core/utils/formatDynamicString.tsx", "src/renderer/int/src/features/About", "src/renderer/int/src/features/BugReport", "src/renderer/int/src/features/update"],
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "composite": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@components/*": [
+        "src/renderer/core/src/components/*"
+      ],
+      "@core-components/*": [
+        "src/renderer/core/src/components/*"
+      ],
+      "@renderer/*": [
+        "src/renderer/core/src/*"
+      ],
+      "@core/*": [
+        "src/renderer/core/src/*"
+      ],
+      "@shared/*" : [
+        "src/shared/*"
+      ],
+      "@main/*": [
+        "src/main/*"
+      ],
+      "@node_modules": [
+        "node_modules"
+      ],
+      "@int": [
+        "src/renderer/adapters/stubs.tsx"
+      ],
+      "@adapters": [
+        "src/renderer/adapters"
+      ]
+    }
+  }
+}

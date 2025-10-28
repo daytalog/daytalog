@@ -1,0 +1,130 @@
+name: Sync to Build Repo (PR)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sync:
+    if: >-
+      ${{ github.event.pull_request.merged == true &&
+          github.actor != 'github-actions[bot]' &&
+          !contains(github.event.pull_request.title, '[sync-skip]') &&
+          !contains(github.event.pull_request.body, '[sync-skip]') }}
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: owner/target-repo
+      TARGET_BRANCH: main
+      SYNC_BRANCH_PREFIX: sync/from-daytalog-
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Install rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Prepare workspace
+        run: |
+          mkdir -p target
+
+      - name: Clone target repo
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target
+          cd target
+          git fetch origin "${TARGET_BRANCH}:${TARGET_BRANCH}" || true
+          git checkout "${TARGET_BRANCH}" || git checkout -b "${TARGET_BRANCH}"
+
+      - name: Overlay only files changed in the merged PR
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+        run: |
+          # 1) Get changed files in the PR (exclude removed)
+          gh api \
+            repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files \
+            --paginate --jq '.[] | select(.status != "removed") | .filename' > /tmp/changed.txt
+
+          # 2) Filter out disallowed paths
+          awk '
+            $0 !~ /^(LICENSE|LICENCE|package\.json|package-lock\.json|electron\.vite\.config\.ts)$/ &&
+            $0 !~ /^node_modules\// &&
+            $0 !~ /^out\// &&
+            $0 !~ /^README(\.|$)/
+          ' /tmp/changed.txt > /tmp/changed.filtered.txt
+
+          # 3) Copy only those files, preserving directory structure (overlay, no deletes)
+          if [ -s /tmp/changed.filtered.txt ]; then
+            while IFS= read -r f; do
+              [ -f "$f" ] || continue
+              rsync -aR "$f" target/
+            done < /tmp/changed.filtered.txt
+          fi
+
+      - name: Create branch, commit changes
+        env:
+          GIT_AUTHOR_NAME: sync-bot
+          GIT_AUTHOR_EMAIL: sync-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: sync-bot
+          GIT_COMMITTER_EMAIL: sync-bot@users.noreply.github.com
+          SOURCE_PR_TITLE: ${{ github.event.pull_request.title }}
+          SOURCE_PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          SOURCE_PR_AUTHOR_ID: ${{ github.event.pull_request.user.id }}
+        run: |
+          cd target
+          BRANCH="${SYNC_BRANCH_PREFIX}${GITHUB_SHA::7}"
+          git checkout -b "$BRANCH"
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes to sync. Exiting."
+            exit 0
+          fi
+          git add -A
+          git commit -m "chore(sync): ${SOURCE_PR_TITLE} [sync-skip]
+
+          Source PR: ${{ github.event.pull_request.html_url }}
+          Source SHA: $GITHUB_SHA
+          Original author: @${SOURCE_PR_AUTHOR_LOGIN}
+
+          Co-authored-by: ${SOURCE_PR_AUTHOR_LOGIN} <${SOURCE_PR_AUTHOR_ID}+${SOURCE_PR_AUTHOR_LOGIN}@users.noreply.github.com>"
+
+      - name: Push branch
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+        run: |
+          cd target
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" HEAD
+
+      - name: Open PR in target repo
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+          SOURCE_PR_TITLE: ${{ github.event.pull_request.title }}
+          SOURCE_PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+        run: |
+          cd target
+          TITLE="chore(sync): ${SOURCE_PR_TITLE}"
+          BODY=$(cat <<'EOF'
+          This PR overlays files changed in the merged source PR.
+
+          - Source PR: ${{ github.event.pull_request.html_url }}
+          - Source SHA: $GITHUB_SHA
+          - Original author: @${SOURCE_PR_AUTHOR_LOGIN}
+
+          Note: contains `[sync-skip]` in commit message to help prevent sync loops.
+          EOF
+          )
+          gh pr create \
+            --repo "$TARGET_REPO" \
+            --base "$TARGET_BRANCH" \
+            --head "$(git rev-parse --abbrev-ref HEAD)" \
+            --title "$TITLE" \
+            --body "$BODY" || echo "PR may already exist."
