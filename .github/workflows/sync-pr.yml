@@ -1,0 +1,79 @@
+name: Create PR in Internal Repo
+
+on:
+  pull_request:
+    branches: [contrib]
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  create-pr:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: daytalog/daytalog-internal
+      TARGET_BRANCH: main
+      GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+      SYNC_BRANCH_PREFIX: sync/from-public-
+
+    steps:
+      - name: Checkout public repo (contrib)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: contrib
+
+      - name: Clean or restore files that should not sync
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+          TARGET_REPO: ${{ env.TARGET_REPO }}
+        run: |
+          set -e
+          echo "Fetching internal main to restore protected files..."
+          git fetch https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git main
+
+          echo "Restoring protected files from internal main"
+          for f in package.json package-lock.json electron.vite.config.ts README.md LICENSE; do
+            git checkout FETCH_HEAD -- "$f" || true
+          done
+
+          echo "Removing public-only directories"
+          rm -rf .github node_modules dist out || true
+
+      - name: Commit filtered tree (if needed)
+        run: |
+          git config user.name "daytabot"
+          git config user.email "daytabot@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(sync): clean public-only files before PR"
+          fi
+
+      - name: Push branch to internal repo
+        run: |
+          BRANCH="${SYNC_BRANCH_PREFIX}${GITHUB_SHA::7}"
+          git checkout -b "$BRANCH"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" HEAD
+
+      - name: Open PR in internal repo
+        run: |
+          TITLE="chore(sync): public contrib -> internal main"
+          BODY=$(cat <<EOF
+          This PR was automatically generated from a merged PR in the public \`contrib\` branch.
+
+          - Source PR: [${{ github.event.pull_request.html_url }}](${{ github.event.pull_request.html_url }})
+          - Source SHA: \`${GITHUB_SHA}\`
+          - Original author: @${{ github.event.pull_request.user.login }}
+
+          Certain files (configs, package.json, etc.) were restored from internal \`main\` or excluded before sync.
+          EOF
+          )
+          gh pr create \
+            --repo "$TARGET_REPO" \
+            --base "$TARGET_BRANCH" \
+            --head "$(git rev-parse --abbrev-ref HEAD)" \
+            --title "$TITLE" \
+            --body "$BODY" || echo "PR may already exist."

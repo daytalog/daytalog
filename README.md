@@ -62,11 +62,11 @@ Contributions are welcome!
 1. Fork the repository
 2. Create a feature branch
 3. Commit with clear messages. Mark commits with `[fix]`, `[feat]`,`[chore]`, or similar.
-4. Open a pull request
+4. Open a pull request targeting the contrib branch.
 
 **Guidelines:**
 
-- For significant features or architectural changes, please open an issue or discussion first to align on design and scope before starting development.
+- For significant features or architectural changes, please open an issue or discussion first to align on design and scope before starting development. You can also [contact me](https://daytalog.com/contact) directly if you prefer.
 - Do **not** include binaries in PRs - if your feature requires compiled components, include the source code and add a build script instead.
 - Keep changes focused.
 

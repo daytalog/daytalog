@@ -1,0 +1,27 @@
+name: Keep contrib in sync with main
+
+on:
+  push:
+    branches:
+      - main # run whenever public/main changes
+
+permissions:
+  contents: write
+
+jobs:
+  update-contib:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout contrib branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: contrib
+
+      - name: Fast-forward contrib to main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch origin main
+          git merge --ff-only origin/main || echo "No fast-forward possible (contrib ahead?)"
+          git push origin HEAD:contrib
