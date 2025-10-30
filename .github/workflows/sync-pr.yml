@@ -16,7 +16,7 @@ jobs:
     env:
       TARGET_REPO: daytalog/daytalog-internal
       TARGET_BRANCH: main
-      GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+      GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
       SYNC_BRANCH_PREFIX: sync/from-public-
 
     steps:
@@ -28,7 +28,7 @@ jobs:
 
       - name: Clean or restore files that should not sync
         env:
-          GH_TOKEN: ${{ secrets.SYNC_BOT_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
           TARGET_REPO: ${{ env.TARGET_REPO }}
         run: |
           set -e
