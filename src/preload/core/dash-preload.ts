@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import type { LogType, PdfType, OcfClipType, SoundClipType, CustomSchemaType } from 'daytalog'
+import type { LogType, PdfType, OcfClipType, SoundClipType } from 'daytalog'
 import type { ProjectType } from '@shared/core/project-types'
-import type { ActiveLogPathType } from '@shared/core/shared-types'
+import type { ActiveLogPathType, GetClipsParams, PathType } from '@shared/core/shared-types'
 import { exposeEmailApiConfig, exposeExternal, exposeSponsorMessage } from './apis/shared'
 import { exposeElectronClipboard } from './apis/clipboard'
 
@@ -39,21 +39,9 @@ const mainApi = {
   ) => {
     ipcRenderer.removeListener('daytalogs-loaded', handler)
   },
-  checkDefaultPaths: (paths: {
-    ocf: string[] | null
-    sound: string[] | null
-    proxy: string | null
-  }) => ipcRenderer.invoke('checkPaths', paths),
-  getDefaultClips: (paths: {
-    ocf: string[] | null
-    sound: string[] | null
-    proxy: string | null
-  }) => ipcRenderer.invoke('getDefaultClips', paths),
-  getClips: (
-    type: 'ocf' | 'sound' | 'proxy' | 'custom',
-    storedClips: OcfClipType[] | SoundClipType[],
-    customSchema: CustomSchemaType | null
-  ) => ipcRenderer.invoke('getClips', type, storedClips, customSchema),
+  checkDefaultPaths: (paths: PathType) => ipcRenderer.invoke('checkPaths', paths),
+  getDefaultClips: (paths: PathType) => ipcRenderer.invoke('getDefaultClips', paths),
+  getClips: (params: GetClipsParams) => ipcRenderer.invoke('getClips', params),
   removeClips: (
     paths: string[],
     type: 'ocf' | 'sound',

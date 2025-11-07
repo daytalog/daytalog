@@ -1,12 +1,12 @@
 import { useQuery, UseQueryOptions } from '@tanstack/react-query'
-import { CheckPathsResult, DefaultPathsInput } from '@shared/core/shared-types'
+import { CheckPathsResult, PathType } from '@shared/core/shared-types'
 
-async function fetchInitialCheckedPaths(paths: DefaultPathsInput) {
+async function fetchInitialCheckedPaths(paths: PathType) {
   return await window.mainApi.checkDefaultPaths(paths)
 }
 
 export function useAccessablePaths(
-  paths: DefaultPathsInput,
+  paths: PathType,
   options?: Omit<
     UseQueryOptions<CheckPathsResult, Error, CheckPathsResult, [string]>,
     'queryKey' | 'queryFn'

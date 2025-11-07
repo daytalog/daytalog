@@ -1,6 +1,13 @@
 import { ipcMain, dialog } from 'electron'
-import { ResponseWithClips, ResponseWithClipsAndPaths } from '@shared/core/shared-types'
-import type { LogType, OcfClipType, SoundClipType, CustomSchemaType } from 'daytalog'
+import type {
+  ResponseWithClips,
+  ResponseWithClipsAndPaths,
+  CheckPathsResult,
+  PathType,
+  GetClipsParams,
+  RemoveClipsParams
+} from '@shared/core/shared-types'
+import type { LogType } from 'daytalog'
 import { Response } from '@shared/core/shared-types'
 import { spawnWorker } from './builder/workers/workerManager'
 import addDefaults from './builder/add-defaults'
@@ -15,58 +22,40 @@ import { ActiveLogPathType } from '@shared/core/shared-types'
 import { ProjectType } from '@shared/core/project-types'
 
 export function setupDaytalogIpcHandlers(): void {
-  ;(ipcMain.handle(
-    'checkPaths',
-    async (
-      _,
-      paths: { ocf: string[] | null; sound: string[] | null; proxy: string | null }
-    ): Promise<{
-      ocf: { path: string; available: boolean }[] | null
-      sound: { path: string; available: boolean }[] | null
-      proxy: { path: string; available: boolean } | null
-    }> => {
-      return await checkPaths(paths)
-    }
-  ),
-    ipcMain.handle(
-      'getDefaultClips',
-      async (
-        _,
-        paths: { ocf: string[] | null; sound: string[] | null; proxy: string | null }
-      ): Promise<ResponseWithClips> => {
-        return await addDefaults(paths)
-      }
-    ))
+  ;(ipcMain.handle('checkPaths', async (_, paths: PathType): Promise<CheckPathsResult> => {
+    return await checkPaths(paths)
+  }),
+    ipcMain.handle('getDefaultClips', async (_, paths: PathType): Promise<ResponseWithClips> => {
+      return await addDefaults(paths)
+    }))
   ipcMain.handle(
     'getClips',
-    async (
-      _,
-      type: 'ocf' | 'sound' | 'proxy' | 'custom',
-      storedClips: OcfClipType[] | SoundClipType[],
-      customSchema: CustomSchemaType | null
-    ): Promise<ResponseWithClipsAndPaths> => {
-      let paths: string | string[] | null = null
-      //let custom_schemas: CustomSchemaType[] | undefined
-      if (type === 'custom') {
-        const csvdialog = await dialog.showOpenDialog({
-          title: 'Select a CSV file',
-          filters: [{ name: 'CSV Files', extensions: ['csv'] }],
-          properties: ['openFile']
-        })
-        if (csvdialog.canceled) return { success: false, error: 'User cancelled', cancelled: true }
-        paths = csvdialog.filePaths
-      } else {
-        const dialogResult = await dialog.showOpenDialog({ properties: ['openDirectory'] })
-        if (dialogResult.canceled)
-          return { success: false, error: 'User cancelled', cancelled: true }
-        paths = dialogResult.filePaths
+    async (_, params: GetClipsParams): Promise<ResponseWithClipsAndPaths> => {
+      const { type, storedClips, customSchema, refreshPath } = params
+      let paths: string[] | null = refreshPath && refreshPath.trim() ? [refreshPath] : null
+      if (!paths) {
+        if (type === 'custom') {
+          const csvdialog = await dialog.showOpenDialog({
+            title: 'Select a CSV file',
+            filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+            properties: ['openFile']
+          })
+          if (csvdialog.canceled)
+            return { success: false, error: 'User cancelled', cancelled: true }
+          paths = csvdialog.filePaths
+        } else {
+          const dialogResult = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+          if (dialogResult.canceled)
+            return { success: false, error: 'User cancelled', cancelled: true }
+          paths = dialogResult.filePaths
+        }
       }
       if (!paths) {
         return { success: false, error: 'No valid path selected' }
       }
 
       let scriptName = ''
-      let responsePaths: ActiveLogPathType = {
+      let responsePaths: PathType = {
         ocf: null,
         sound: null,
         proxy: null
@@ -82,7 +71,7 @@ export function setupDaytalogIpcHandlers(): void {
           break
         case 'proxy':
           scriptName = 'addProxyWorker'
-          responsePaths.proxy = paths[0]
+          responsePaths.proxy = paths
           break
         case 'custom':
           scriptName = 'addCustomWorker'
@@ -92,9 +81,13 @@ export function setupDaytalogIpcHandlers(): void {
       }
 
       try {
-        console.log('scriptname:', scriptName)
+        if (type === 'proxy' && storedClips.length === 0) {
+          logger.debug('No ocf clips to match proxies with returning paths', scriptName)
+          return { success: true, clips: { proxy: [] }, paths: responsePaths }
+        }
+        logger.debug('spawning:', scriptName)
         const { promise } = spawnWorker(scriptName, { paths, storedClips, customSchema })
-        //return await promise
+
         const result = await promise
         if (result.success) {
           return { ...result, paths: responsePaths }
@@ -110,12 +103,8 @@ export function setupDaytalogIpcHandlers(): void {
 
   ipcMain.handle(
     'removeClips',
-    async (
-      _,
-      paths: string[],
-      type: 'ocf' | 'sound',
-      storedClips: OcfClipType[] | SoundClipType[]
-    ): Promise<ResponseWithClips> => {
+    async (_, params: RemoveClipsParams): Promise<ResponseWithClips> => {
+      const { paths, type, storedClips } = params
       switch (type) {
         case 'ocf':
           return await removeOcf(paths, storedClips)

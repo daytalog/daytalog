@@ -9,13 +9,23 @@ import { ensureDirectoryExists, fileExists } from '../utils/crud'
 import { dialog } from 'electron'
 import deleteDaytalog from './delete'
 import { updateState } from '../app-state/updater'
+import menuManager from '../menu'
+import { areActiveLogsEqual } from './utils/compareActiveLogs'
 
 export const updateActiveLog = async (activeLog: ActiveLogType | null) => {
   const project = appState.project
   if (!project) throw new Error('No project')
-  project.activeLog = activeLog
-  appState.project = project
-  await updateState({ activeProject: appState.config.activeProject, activeLog: activeLog })
+
+  const currentActiveLog = appState.config.activeLog
+  const hasChanged = !areActiveLogsEqual(currentActiveLog, activeLog)
+
+  if (hasChanged) {
+    project.activeLog = activeLog
+    appState.project = project
+    await updateState({ activeProject: appState.config.activeProject, activeLog: activeLog })
+  }
+
+  menuManager.createOrUpdateTray()
 }
 
 const updateDaytalog = async (

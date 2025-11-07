@@ -1,25 +1,15 @@
-import type { CopyType, OcfClipType, SoundClipType } from 'daytalog'
-import { format } from 'daytalog'
-import { useMemo, useState } from 'react'
-import { useWatch } from 'react-hook-form'
+import type { CopyType } from 'daytalog'
 import { Button } from '@components/ui/button'
+import EmptyState from './EmptyState'
+import { X } from 'lucide-react'
 
 interface CopiesListProps {
   type: 'ocf' | 'sound'
+  copies: CopyType[]
   handleRemoveCopy: (copy: CopyType, type: 'ocf' | 'sound') => void
 }
 
-export const CopiesList = ({ type, handleRemoveCopy }: CopiesListProps) => {
-  const [copies, setCopies] = useState<CopyType[]>([])
-
-  // @ts-expect-error - Schema transformation makes types incompatible but runtime is correct
-  const clips: (OcfClipType | SoundClipType)[] = useWatch({ name: `${type}.clips` })
-
-  useMemo(() => {
-    const newCopies = clips?.length > 0 ? format.formatCopiesFromClips(clips) : []
-    setCopies(newCopies)
-  }, [clips])
-
+const CopiesList = ({ type, copies, handleRemoveCopy }: CopiesListProps) => {
   if (copies?.length > 0) {
     return (
       <ul role="list" className="mt-2 divide-y divide-white/10 rounded-md border border-white/20">
@@ -46,7 +36,7 @@ export const CopiesList = ({ type, handleRemoveCopy }: CopiesListProps) => {
             </div>
             <div className="ml-4 flex-shrink-0">
               <Button size="sm" variant="destructive" onClick={() => handleRemoveCopy(copy, type)}>
-                Remove
+                <X className="size-4" />
               </Button>
             </div>
           </li>
@@ -54,6 +44,8 @@ export const CopiesList = ({ type, handleRemoveCopy }: CopiesListProps) => {
       </ul>
     )
   } else {
-    return null
+    return <EmptyState message="No Copies" />
   }
 }
+
+export default CopiesList

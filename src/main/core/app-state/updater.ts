@@ -5,6 +5,7 @@ import { state, error } from './types'
 import { ActiveLogType } from '@shared/core/shared-types'
 import { appState } from './state'
 import logger from '@core-logger'
+import { stopAutoUpdate, isAutoUpdateRunning } from '../autoupdate/autoupdate'
 
 interface updateProps {
   activeProject: string | null
@@ -26,6 +27,10 @@ async function saveStateToFile(data: state): Promise<error | undefined> {
 export async function updateState({ activeProject, activeLog }: updateProps): Promise<void> {
   logger.debug('update state started')
   try {
+    if (isAutoUpdateRunning()) {
+      logger.debug('State changed (project or activeLog), stopping autoupdate')
+      stopAutoUpdate()
+    }
     appState.config = { activeProject, activeLog }
     await saveStateToFile({ activeProject, activeLog })
     logger.debug(`State updated. Project: ${activeProject}, Active log: ${activeLog?.id ?? 'none'}`)

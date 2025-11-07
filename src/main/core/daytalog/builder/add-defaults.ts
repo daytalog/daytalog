@@ -1,15 +1,15 @@
 import { spawnWorker } from './workers/workerManager'
-import { ResponseWithClips } from '@shared/core/shared-types'
+import { ResponseWithClips, PathType } from '@shared/core/shared-types'
 import logger from '../../utils/logger'
+import type { OcfClipType, SoundClipType } from 'daytalog'
 
-const addDefaults = async (paths: {
-  ocf: string[] | null
-  sound: string[] | null
-  proxy: string | null
-}): Promise<ResponseWithClips> => {
-  let ocfResult: ResponseWithClips
-  let soundResult: ResponseWithClips
-  let proxyResult: ResponseWithClips | null = null
+const addDefaults = async (
+  paths: PathType,
+  storedClips?: { ocf: OcfClipType[] | null; sound: SoundClipType[] | null }
+): Promise<ResponseWithClips> => {
+  let ocfResult: ResponseWithClips | undefined
+  let soundResult: ResponseWithClips | undefined
+  let proxyResult: ResponseWithClips | undefined
 
   try {
     const promises: Promise<void>[] = []
@@ -17,7 +17,7 @@ const addDefaults = async (paths: {
     if (paths.ocf?.length) {
       const { promise } = spawnWorker('addOCFWorker', {
         paths: paths.ocf,
-        storedClips: [],
+        storedClips: storedClips?.ocf ?? [],
         customSchema: null
       })
       promises.push(
@@ -31,7 +31,7 @@ const addDefaults = async (paths: {
     if (paths.sound?.length) {
       const { promise } = spawnWorker('addSoundWorker', {
         paths: paths.sound,
-        storedClips: [],
+        storedClips: storedClips?.sound ?? [],
         customSchema: null
       })
       promises.push(
@@ -43,22 +43,22 @@ const addDefaults = async (paths: {
 
     if (promises.length > 0) await Promise.all(promises)
 
-    //@ts-ignore
-    if (paths.ocf?.length && !ocfResult?.success) {
-      //@ts-ignore
-      throw new Error(ocfResult?.error ?? 'OCF error')
+    if (paths.ocf?.length && ocfResult && !ocfResult.success) {
+      throw new Error(ocfResult.error ?? 'OCF error')
     }
     // Safely check Sound (if used)
-    //@ts-ignore
-    if (paths.sound?.length && !soundResult?.success) {
-      //@ts-ignore
-      throw new Error(soundResult?.error ?? 'Sound error')
+
+    if (paths.sound?.length && soundResult && !soundResult.success) {
+      throw new Error(soundResult.error ?? 'Sound error')
     }
-    //@ts-ignore
-    if (paths.proxy && ocfResult?.success) {
+    if (paths.proxy?.length) {
+      // Use fresh OCF clips if available, otherwise use stored clips from active log
+      const ocfClipsForProxy =
+        ocfResult?.success && ocfResult.clips?.ocf ? ocfResult.clips.ocf : (storedClips?.ocf ?? [])
+
       const { promise } = spawnWorker('addProxyWorker', {
         paths: paths.proxy,
-        storedClips: ocfResult?.clips?.ocf ?? [],
+        storedClips: ocfClipsForProxy,
         customSchema: null
       })
       proxyResult = await promise
@@ -66,13 +66,11 @@ const addDefaults = async (paths: {
     }
 
     const clips: Record<string, any> = {}
-    //@ts-ignore
+
     if (ocfResult && ocfResult.success && ocfResult.clips.ocf) {
-      //@ts-ignore
       clips.ocf = ocfResult.clips.ocf
-    } //@ts-ignore
+    }
     if (soundResult && soundResult.success && soundResult.clips.sound) {
-      //@ts-ignore
       clips.sound = soundResult.clips.sound
     }
     if (proxyResult && proxyResult.success && proxyResult.clips.proxy) {

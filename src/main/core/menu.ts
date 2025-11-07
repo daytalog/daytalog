@@ -12,6 +12,13 @@ import logger from '@core-logger'
 import { supportsSubLabel } from './utils/supports'
 import { createAboutWindow, createReportWindow } from '@adapter'
 import { openOnboardWindow } from '@core-windows/onboarding/onboardWindow'
+import {
+  startAutoUpdate,
+  stopAutoUpdate,
+  isAutoUpdateRunning,
+  getDirtyPathsByType
+} from './autoupdate/autoupdate'
+import { updateActiveLog } from './daytalog/updater'
 
 interface buildContextMenuProps {
   progress?: string
@@ -66,7 +73,17 @@ const StatsMenu = (activeLog: LogType | null): MenuItemConstructorOptions => {
 
     const lines = [durationLine, reelsLine, sizeLine, ...formatCopies(clips)].filter(Boolean)
 
-    return lines.join('\n')
+    let result = lines.join('\n')
+
+    // Append dirty message if autoupdate is running and paths are dirty
+    if (isAutoUpdateRunning()) {
+      const dirtyPaths = getDirtyPathsByType()
+      if (dirtyPaths.ocf) {
+        result += '\n\n⏳ Update pending (waiting for disk to become idle)'
+      }
+    }
+
+    return result
   }
 
   const sound = () => {
@@ -83,7 +100,17 @@ const StatsMenu = (activeLog: LogType | null): MenuItemConstructorOptions => {
       `Size: ${getSize(activeLog.sound, { output: 'string' })} ${isOverride(size)}`
     const lines = [filesLine, sizeLine, ...formatCopies(clips)].filter(Boolean)
 
-    return lines.join('\n')
+    let result = lines.join('\n')
+
+    // Append dirty message if autoupdate is running and paths are dirty
+    if (isAutoUpdateRunning()) {
+      const dirtyPaths = getDirtyPathsByType()
+      if (dirtyPaths.sound) {
+        result += '\n\n⏳ Update pending (waiting for disk to become idle)'
+      }
+    }
+
+    return result
   }
 
   const proxy = () => {
@@ -117,7 +144,17 @@ const StatsMenu = (activeLog: LogType | null): MenuItemConstructorOptions => {
       `Size: ${getSize(activeLog.proxy, { output: 'string' })} ${isOverride(size)}`
 
     const lines = [filesLine, sizeLine, InfoLine()].filter(Boolean)
-    return lines.join('\n')
+    let result = lines.join('\n')
+
+    // Append dirty message if autoupdate is running and paths are dirty
+    if (isAutoUpdateRunning()) {
+      const dirtyPaths = getDirtyPathsByType()
+      if (dirtyPaths.proxy) {
+        result += '\n\n⏳ Update pending (waiting for disk to become idle)'
+      }
+    }
+
+    return result
   }
 
   return {
@@ -240,11 +277,35 @@ const buildContextMenu = ({ progress }: buildContextMenuProps): Menu => {
       enabled: !!activeProject
     },
     {
+      label: 'Switch Shooting Day',
+      submenu: logs
+        ? Array.from(logs.values()).map((log) => ({
+            id: log.id,
+            label: log.id,
+            enabled: log.id !== activeLog?.id,
+            click: (): Promise<void> => updateActiveLog({ id: log.id, paths: null })
+          }))
+        : [{ label: 'No Logs in folder', enabled: false }]
+    },
+    { type: 'separator' },
+    {
       label: `Update ${activeLog?.id ?? ''}`,
       click: () => {
         getDaytalogWindow({ navigate: 'builder', builderId: activeLog?.id })
       },
       enabled: !!activeLog
+    },
+    {
+      label: isAutoUpdateRunning() ? 'Stop Auto Update' : 'Start Auto Update',
+      click: () => {
+        if (isAutoUpdateRunning()) {
+          stopAutoUpdate()
+        } else {
+          startAutoUpdate()
+        }
+        trayManager.createOrUpdateTray()
+      },
+      enabled: !!activeProject?.activeLog?.paths
     },
     { type: 'separator' },
     {

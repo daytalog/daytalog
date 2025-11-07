@@ -8,7 +8,9 @@ import type {
   OpenModalTypes,
   CheckPathsResult,
   ResponseWithClips,
-  ActiveLogPathType
+  ActiveLogPathType,
+  PathType,
+  RemoveClipsParams
 } from '@shared/core/shared-types'
 import type { CustomSchemaType, LogType, OcfClipType, SoundClipType } from 'daytalog'
 import type { TemplateDirectoryFile, PdfType } from '@shared/core/project-types'
@@ -38,26 +40,10 @@ declare global {
         callback: (daytalogs: LogType[]) => void
       ) => (event: IpcRendererEvent, daytalogs: LogType[]) => void
       offDaytalogsLoaded: (handler: (event: IpcRendererEvent, daytalogs: LogType[]) => void) => void
-      checkDefaultPaths: (paths: {
-        ocf: string[] | null
-        sound: string[] | null
-        proxy: string | null
-      }) => Promise<CheckPathsResult>
-      getDefaultClips: (paths: {
-        ocf: string[] | null
-        sound: string[] | null
-        proxy: string | null
-      }) => Promise<ResponseWithClips>
-      getClips: (
-        type: 'ocf' | 'sound' | 'proxy' | 'custom',
-        storedClips: OcfClipType[] | SoundClipType[],
-        customSchema: CustomSchemaType | null
-      ) => Promise<ResponseWithClipsAndPaths>
-      removeClips: (
-        paths: string[],
-        type: 'ocf' | 'sound',
-        storedClips: OcfClipType[] | SoundClipType[]
-      ) => Promise<ResponseWithClips>
+      checkDefaultPaths: (paths: PathType) => Promise<CheckPathsResult>
+      getDefaultClips: (paths: PathType) => Promise<ResponseWithClips>
+      getClips: (params: GetClipsParams) => Promise<ResponseWithClipsAndPaths>
+      removeClips: (params: RemoveClipsParams) => Promise<ResponseWithClips>
       openSendWindow: (selection?: string[]) => void
       openBuilder: (callback: (event: IpcRendererEvent, id: string | null) => void) => () => void
       openSettings: (callback: () => void) => () => void

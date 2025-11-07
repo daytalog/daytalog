@@ -22,15 +22,17 @@ export const getPaths = (project: ProjectRootType, tags: Tags, id?: string) => {
     : (project.default_sound_paths || []).map((path) => replaceTags(path, tags))
 
   const proxy = isActive
-    ? project.activeLog?.paths?.proxy ||
-      (project.default_proxy_path ? replaceTags(project.default_proxy_path, tags) : null)
+    ? mergePaths(
+        project.activeLog?.paths?.proxy,
+        project.default_proxy_path ? [project.default_proxy_path] : undefined
+      )
     : project.default_proxy_path
-      ? replaceTags(project.default_proxy_path, tags)
-      : null
+      ? [replaceTags(project.default_proxy_path, tags)]
+      : []
 
   return {
     ocf: ocf.length ? ocf : null,
     sound: sound.length ? sound : null,
-    proxy
+    proxy: proxy.length ? proxy : null
   }
 }

@@ -4,10 +4,11 @@ import { Button } from '@components/ui/button'
 import { Plus, X } from 'lucide-react'
 import { useWatch, useFormContext } from 'react-hook-form'
 import type { CustomType, CustomSchemaType } from 'daytalog'
+import { HandleAddClipsParams } from './types'
 
 type CustomSectionProps = {
   schema: CustomSchemaType
-  handleAddClips: (type: 'custom', schema: CustomSchemaType) => void
+  handleAddClips: (params: HandleAddClipsParams) => void
   removeCustomSchema: (schema: CustomSchemaType) => void
 }
 
@@ -30,7 +31,7 @@ const CustomSection = ({ schema, handleAddClips, removeCustomSchema }: CustomSec
         {`${clips && clips > 0 ? clips : 'No'} clips added`}
       </p>
       <div className="mt-2 flex gap-2">
-        <Button size="sm" onClick={() => handleAddClips('custom', schema)}>
+        <Button size="sm" onClick={() => handleAddClips({ type: 'custom', schema })}>
           <Plus className="size-4" />
           Select CSV file
         </Button>

@@ -5,7 +5,8 @@ import type {
   OcfClipType,
   SoundClipType,
   ProxyClipType,
-  CustomType
+  CustomType,
+  CustomSchemaType
 } from 'daytalog'
 import * as z from 'zod'
 
@@ -81,6 +82,19 @@ export type ResponseWithClipsAndPaths =
     }
   | { success: false; error: string; cancelled?: boolean }
 
+export type GetClipsParams = {
+  type: 'ocf' | 'sound' | 'proxy' | 'custom'
+  storedClips: OcfClipType[] | SoundClipType[]
+  customSchema: CustomSchemaType | null
+  refreshPath: string | null
+}
+
+export type RemoveClipsParams = {
+  paths: string[]
+  type: 'ocf' | 'sound'
+  storedClips: OcfClipType[] | SoundClipType[]
+}
+
 export type OpenModalTypes = 'new-project' | 'new-shooting-day' | 'project-settings'
 
 export type InitialEditorData = {
@@ -113,20 +127,21 @@ export interface CheckResult {
 export interface CheckPathsResult {
   ocf: CheckResult[] | null
   sound: CheckResult[] | null
-  proxy: CheckResult | null
+  proxy: CheckResult[] | null
 }
 
-const activeLogPathZod = z
-  .object({
-    ocf: z.array(z.string()).nullable(),
-    sound: z.array(z.string()).nullable(),
-    proxy: z.string().nullable()
-  })
-  .nullable()
+const LogPathZod = z.object({
+  ocf: z.array(z.string()).nullable(),
+  sound: z.array(z.string()).nullable(),
+  proxy: z.array(z.string()).nullable()
+})
+
+const activeLogPathZod = LogPathZod.nullable()
 
 export const activeLogZod = z.object({
   id: z.string(),
   paths: activeLogPathZod
 })
+export type PathType = z.infer<typeof LogPathZod>
 export type ActiveLogPathType = z.infer<typeof activeLogPathZod>
 export type ActiveLogType = z.infer<typeof activeLogZod>

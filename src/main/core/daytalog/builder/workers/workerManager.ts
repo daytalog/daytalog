@@ -27,7 +27,7 @@ const workerFactoryMap: Record<string, string> = {
 export function spawnWorker(
   scriptName: string,
   payload: {
-    paths: string | string[]
+    paths: string[]
     storedClips: OcfClipType[] | SoundClipType[]
     customSchema: CustomSchemaType | null
   }

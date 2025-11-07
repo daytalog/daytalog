@@ -1,12 +1,6 @@
 import { access } from 'fs/promises'
 import { constants } from 'fs'
-import { CheckPathsResult, CheckResult } from '@shared/core/shared-types'
-
-interface PathsInput {
-  ocf: string[] | null
-  sound: string[] | null
-  proxy: string | null
-}
+import { CheckPathsResult, CheckResult, PathType } from '@shared/core/shared-types'
 
 const checkPath = async (path: string): Promise<CheckResult> => {
   try {
@@ -17,7 +11,7 @@ const checkPath = async (path: string): Promise<CheckResult> => {
   }
 }
 
-const checkPaths = async (paths: PathsInput): Promise<CheckPathsResult> => {
+const checkPaths = async (paths: PathType): Promise<CheckPathsResult> => {
   const result: CheckPathsResult = { ocf: null, sound: null, proxy: null }
 
   if (paths.ocf) {
@@ -27,7 +21,7 @@ const checkPaths = async (paths: PathsInput): Promise<CheckPathsResult> => {
     result.sound = await Promise.all(paths.sound.map(checkPath))
   }
   if (paths.proxy) {
-    result.proxy = await checkPath(paths.proxy)
+    result.proxy = await Promise.all(paths.proxy.map(checkPath))
   }
 
   return result

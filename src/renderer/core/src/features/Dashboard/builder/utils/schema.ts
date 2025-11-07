@@ -26,6 +26,11 @@ export const daytalogFormSchema = z.object({
   ocf: makeNullableExcept(OCFZod, ['clips']),
   sound: makeNullableExcept(SoundZod, ['clips']),
   proxy: makeNullableExcept(ProxyZod, ['clips']),
-  custom: LogZod.shape.custom
+  custom: LogZod.shape.custom,
+  paths: z.object({
+    ocf: z.array(z.string()).nullable(),
+    sound: z.array(z.string()).nullable(),
+    proxy: z.array(z.string()).nullable()
+  })
 })
 export type daytalogFormType = z.infer<typeof daytalogFormSchema>

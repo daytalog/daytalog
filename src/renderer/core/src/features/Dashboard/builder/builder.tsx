@@ -1,4 +1,3 @@
-import { useRef } from 'react'
 import { Button } from '@components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@components/ui/tabs'
 import type { LogType } from 'daytalog'
@@ -38,9 +37,6 @@ const Builder = ({
   selected
 }: BuilderdialogProps) => {
   const navigate = useNavigate()
-  const ocfPaths = useRef(new Set(initialPaths?.ocf))
-  const soundPaths = useRef(new Set(initialPaths?.sound))
-  const proxyPaths = useRef(new Set(initialPaths?.proxy))
 
   const form = useForm<daytalogFormType>({
     defaultValues: {
@@ -67,7 +63,12 @@ const Builder = ({
         size: selected?.proxy?.size ?? null,
         clips: selected?.proxy?.clips ?? []
       },
-      custom: selected?.custom ?? []
+      custom: selected?.custom ?? [],
+      paths: {
+        ocf: initialPaths?.ocf ?? null,
+        sound: initialPaths?.sound ?? null,
+        proxy: initialPaths?.proxy ?? null
+      }
     },
     mode: 'onBlur',
     resolver: zodResolver(daytalogFormSchema) as Resolver<daytalogFormType>
@@ -84,14 +85,10 @@ const Builder = ({
   }
 
   const onSubmit: SubmitHandler<daytalogFormType> = async (data): Promise<void> => {
-    const cleanedData = removeEmptyFields(data, { keysToKeep: ['hash'] }) as LogType
+    const { paths, ...rest } = data
+    const cleanedData = removeEmptyFields(rest, { keysToKeep: ['hash'] }) as LogType
     const oldDaytalog = selected
-    const paths = {
-      ocf: ocfPaths.current.size > 0 ? Array.from(ocfPaths.current) : null,
-      sound: soundPaths.current.size > 0 ? Array.from(soundPaths.current) : null,
-      proxy: proxyPaths.current.size > 0 ? Array.from(proxyPaths.current)[0] : null
-    }
-    console.log('paths', paths)
+
     try {
       const res = await window.mainApi.updateDaytalog(cleanedData, paths, oldDaytalog)
       if (res.success) {
@@ -148,12 +145,7 @@ const Builder = ({
           </TabsContent>
           <TabsContent value="import" asChild tabIndex={-1}>
             <div className="lg:col-start-2 col-span-3 mb-32">
-              <Import
-                project={project}
-                ocfPaths={ocfPaths}
-                soundPaths={soundPaths}
-                proxyPaths={proxyPaths}
-              />
+              <Import project={project} />
             </div>
           </TabsContent>
           <TabsContent value="clips" asChild tabIndex={-1}>

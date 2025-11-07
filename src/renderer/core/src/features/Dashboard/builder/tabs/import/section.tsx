@@ -1,120 +1,99 @@
-import React from 'react'
+import { useMemo, useState } from 'react'
 import { Label } from '@components/ui/label'
 import { Button } from '@components/ui/button'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { useWatch } from 'react-hook-form'
-import { CustomSchemaType } from 'daytalog'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@components/ui/tabs'
+import CopiesList from './CopiesList'
+import PathsList from './PathsList'
+import { CopyType, format } from 'daytalog'
+import { HandleAddClipsParams } from './types'
 
-interface CommonSectionProps {
-  label: string
-  disabled?: boolean
-  handleRemoveClipsLocal?: () => void
-}
+type SectionProps =
+  | {
+      type: 'proxy'
+      label: string
+      handleAddClips: (params: HandleAddClipsParams) => void
+      handleRemovePath: (path: string, type: 'ocf' | 'sound' | 'proxy') => void
+      handleRemoveProxyClips: () => void
+      loadingOpen: boolean
+    }
+  | {
+      type: 'ocf' | 'sound'
+      label: string
+      handleAddClips: (params: HandleAddClipsParams) => void
+      handleRemoveCopy: (copy: CopyType, type: 'ocf' | 'sound') => void
+      handleRemovePath: (path: string, type: 'ocf' | 'sound' | 'proxy') => void
+      loadingOpen: boolean
+    }
 
-type CustomSectionProps = CommonSectionProps & {
-  type: 'custom'
-  schema: CustomSchemaType
-  handleAddClips: (type: 'custom', schema: CustomSchemaType) => void
-  children?: React.ReactNode
-}
+export const Section = (props: SectionProps) => {
+  const { type } = props
+  const [copies, setCopies] = useState<CopyType[]>([])
 
-type OtherSectionProps = CommonSectionProps & {
-  type: 'ocf' | 'sound' | 'proxy'
-  handleAddClips: (type: 'ocf' | 'sound' | 'proxy') => void
-  schema?: undefined
-  children?: React.ReactNode
-}
+  const clips = useWatch({ name: `${type}.clips` })
+  const paths: string[] | null = useWatch({ name: `paths.${type}` })
 
-type SectionProps = CustomSectionProps | OtherSectionProps
+  useMemo(() => {
+    if (type !== 'proxy') {
+      const newCopies = clips?.length > 0 ? format.formatCopiesFromClips(clips) : []
+      setCopies(newCopies)
+    }
+  }, [clips, type])
 
-const ClipN = (clips, schema) => {
-  const clipsN = clips.find((s) => s.id === schema.id)?.clips
-  return clipsN && clipsN.length > 0 ? clipsN : 'No'
-}
+  return (
+    <div key={type}>
+      <Label htmlFor={`${type}-copies`} className="text-base">
+        {props.label}
+      </Label>
+      <p className="text-muted-foreground text-sm">{`${clips && clips.length > 0 ? clips.length : 'No'} clips added`}</p>
 
-export const Section = ({
-  type,
-  schema,
-  label,
-  disabled,
-  handleAddClips,
-  children
-}: SectionProps) => {
-  const clips = useWatch({ name: type === 'custom' ? 'custom' : `${type}.clips` })
-
-  if (type === 'ocf') {
-    return (
-      <div key={type}>
-        <Label htmlFor={`${type}-copies`} className="text-base">
-          {label}
-        </Label>
-        <p className="text-muted-foreground text-sm">{`${clips && clips.length > 0 ? clips.length : 'No'} clips added`}</p>
-        {children}
-        <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => handleAddClips(type)}>
-            <Plus className="size-4" />
-            Add Folder
-          </Button>
+      <Tabs defaultValue={copies.length > 0 ? 'copies' : 'paths'}>
+        <div className="relative">
+          <TabsList className="absolute -top-11 right-0 left-0 mx-auto w-fit px-2 py-1 rounded-sm border border-white/20 bg-transparent">
+            {type !== 'proxy' && (
+              <TabsTrigger
+                className="text-xs rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-blue-400"
+                value="copies"
+              >
+                Copies
+              </TabsTrigger>
+            )}
+            <TabsTrigger
+              className="text-xs rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-blue-400"
+              value="paths"
+            >
+              Paths
+            </TabsTrigger>
+          </TabsList>
         </div>
-      </div>
-    )
-  } else if (type === 'sound') {
-    const watchClips = useWatch({ name: `ocf.clips` })
-    return (
-      <div key={type}>
-        <Label htmlFor={`${type}-copies`} className="text-base">
-          {label}
-        </Label>
-        <p className="text-muted-foreground text-sm">{`${clips && clips.length > 0 ? clips.length : 'No'} clips added`}</p>
-        {children}
-        <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => handleAddClips(type)} disabled={watchClips.length === 0}>
-            <Plus className="size-4" />
-            Add Folder
+        {type !== 'proxy' && (
+          <TabsContent value="copies">
+            <CopiesList type={type} copies={copies} handleRemoveCopy={props.handleRemoveCopy} />
+          </TabsContent>
+        )}
+        <TabsContent value="paths">
+          <PathsList
+            type={type}
+            paths={paths}
+            handleRemovePath={props.handleRemovePath}
+            handleRefresh={props.handleAddClips}
+            loadingOpen={props.loadingOpen}
+          />
+        </TabsContent>
+      </Tabs>
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" onClick={() => props.handleAddClips({ type })}>
+          <Plus className="size-4" />
+          Add Folder
+        </Button>
+        {type === 'proxy' && clips && clips.length > 0 ? (
+          <Button size="sm" onClick={props.handleRemoveProxyClips} variant="destructive">
+            <X className="size-4" />
+            Clear
           </Button>
-        </div>
+        ) : null}
       </div>
-    )
-  } else if (type === 'proxy') {
-    const watchClips = useWatch({ name: `ocf.clips` })
-    return (
-      <div key={type}>
-        <Label htmlFor={`${type}-copies`} className="text-base">
-          {label}
-        </Label>
-        <p className="text-muted-foreground text-sm">
-          {`${clips && clips.length > 0 ? clips.length : 'No'} clips added`}
-        </p>
-        <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => handleAddClips(type)} disabled={watchClips.length === 0}>
-            <Plus className="size-4" />
-            Add Folder
-          </Button>
-          {clips && clips.length > 0 ? children : null}
-        </div>
-      </div>
-    )
-  } else if (type === 'custom') {
-    return (
-      <div key={`${type}_${schema.id}`}>
-        <Label htmlFor={`${type}-copies`} className="text-base capitalize">
-          {label}
-        </Label>
-        <p className="text-muted-foreground text-sm">
-          {disabled
-            ? 'Add Custom fields in app settings to enable this option'
-            : `${ClipN(clips, schema)} clips added`}
-        </p>
-        <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => handleAddClips(type, schema)} disabled={disabled}>
-            <Plus className="size-4" />
-            Select CSV file
-          </Button>
-          {clips && clips.length > 0 ? children : null}
-        </div>
-      </div>
-    )
-  } else {
-    return null
-  }
+    </div>
+  )
 }

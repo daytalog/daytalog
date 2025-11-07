@@ -10,9 +10,9 @@ import {
 } from '@components/ui/alert-dialog'
 import type {
   CheckResult,
-  DefaultPathsInput,
   CheckPathsResult,
-  ActiveLogPathType
+  ActiveLogPathType,
+  PathType
 } from '@shared/core/shared-types'
 import { useState } from 'react'
 import { useFormContext } from 'react-hook-form'
@@ -27,11 +27,11 @@ function hasPaths(paths: ActiveLogPathType): boolean {
   return (
     (Array.isArray(paths?.ocf) && paths.ocf.length > 0) ||
     (Array.isArray(paths?.sound) && paths.sound.length > 0) ||
-    (typeof paths?.proxy === 'string' && paths.proxy.trim().length > 0)
+    (Array.isArray(paths?.proxy) && paths.proxy.length > 0)
   )
 }
 
-function getAvailablePaths(data: CheckPathsResult): DefaultPathsInput {
+function getAvailablePaths(data: CheckPathsResult): PathType {
   return {
     ocf: data.ocf
       ? data.ocf.filter((item) => item.available).map((item) => item.path) || null
@@ -39,7 +39,9 @@ function getAvailablePaths(data: CheckPathsResult): DefaultPathsInput {
     sound: data.sound
       ? data.sound.filter((item) => item.available).map((item) => item.path) || null
       : null,
-    proxy: data.proxy && data.proxy.available ? data.proxy.path : null
+    proxy: data.proxy
+      ? data.proxy.filter((item) => item.available).map((item) => item.path) || null
+      : null
   }
 }
 
@@ -120,7 +122,7 @@ const DefaultsDialog = ({ paths }: DefaultsDialogProps) => {
                 data
                   ? (!data.ocf || data.ocf.every((item) => !item.available)) &&
                     (!data.sound || data.sound.every((item) => !item.available)) &&
-                    (!data.proxy || !data.proxy.available)
+                    (!data.proxy || data.proxy.every((item) => !item.available))
                   : true
               }
             >

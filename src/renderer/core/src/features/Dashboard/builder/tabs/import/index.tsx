@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import type { RefObject } from 'react'
-import { Button } from '@components/ui/button'
 import { mergeDirtyValues } from '../../utils/merge-clips'
 import type {
   CopyType,
@@ -11,46 +9,45 @@ import type {
   SoundClipType
 } from 'daytalog'
 import { useFormContext } from 'react-hook-form'
-import { CopiesList } from './CopiesList'
-import { X } from 'lucide-react'
-import { Section } from './section'
+import { Section } from './Section'
 import { ProjectRootType } from '@shared/core/project-types'
 import LoadingDialog from '@components/LoadingDialog'
-import CustomSection from './customSection'
-
+import CustomSection from './CustomSection'
+import { toast } from 'sonner'
+import { GetClipsParams, RemoveClipsParams } from '@shared/core/shared-types'
+import { HandleAddClipsParams } from './types'
 interface ImportProps {
   project: ProjectRootType
-  ocfPaths: RefObject<Set<string>>
-  soundPaths: RefObject<Set<string>>
-  proxyPaths: RefObject<Set<string>>
 }
 
-function getVolumeName(filePath: string): string {
-  if (filePath.startsWith('/Volumes/')) {
-    const parts = filePath.split('/')
-    return parts.length > 2 ? parts[2] : filePath
-  } else {
-    const parts = filePath.split('/')
-    if (parts.length > 1) {
-      switch (parts[1]) {
-        case 'Users':
-        case 'Applications':
-        case 'System':
-        case 'Library':
-          return 'Macintosh HD'
-        default:
-          return filePath
-      }
-    }
-  }
-
-  return filePath // default return if none of the conditions are met
-}
-
-export const Import = ({ project, ocfPaths, soundPaths, proxyPaths }: ImportProps) => {
+export const Import = ({ project }: ImportProps) => {
   const [loadingOpen, setLoadingOpen] = useState<boolean>(false)
   const schemas = project.custom_schemas?.filter((s) => s.active && s.csv_import)
   const { getValues, setValue, resetField, formState } = useFormContext()
+
+  const addPathNonOverlapping = (type: 'ocf' | 'sound' | 'proxy', newPath: string): void => {
+    const currentPaths = getValues(`paths.${type}`) ?? []
+    const normalize = (p: string) => {
+      let s = p.trim()
+      while (s.length > 1 && s.endsWith('/')) s = s.slice(0, -1)
+      return s.toLowerCase()
+    }
+    const newNorm = normalize(newPath)
+    for (const existing of currentPaths) {
+      const existNorm = normalize(existing)
+      const isParent = newNorm.startsWith(existNorm + '/') || newNorm === existNorm
+      const isChild = existNorm.startsWith(newNorm + '/')
+      if (isParent || isChild) {
+        toast.warning('Skipping path due to overlap', {
+          description: `"${newPath}" conflicts with existing "${existing}"`,
+          duration: 10000
+        })
+        return
+      }
+    }
+    const newPaths = [...currentPaths, newPath]
+    setValue(`paths.${type}`, newPaths)
+  }
 
   function updateClips(fieldPath: 'ocf.clips', newClips: OcfClipType[]): void
   function updateClips(fieldPath: 'sound.clips', newClips: SoundClipType[]): void
@@ -76,26 +73,31 @@ export const Import = ({ project, ocfPaths, soundPaths, proxyPaths }: ImportProp
     setValue('custom', newList)
   }
 
-  async function handleAddClips(type: 'custom', schema: CustomSchemaType): Promise<void>
-  async function handleAddClips(type: 'ocf' | 'sound' | 'proxy'): Promise<void>
-  async function handleAddClips(
-    type: 'ocf' | 'sound' | 'proxy' | 'custom',
-    schema?: CustomSchemaType
-  ): Promise<void> {
+  async function handleAddClips(params: HandleAddClipsParams): Promise<void> {
+    const { type } = params
+    const schema = 'schema' in params ? params.schema : undefined
+    const refreshPath = 'refreshPath' in params ? params.refreshPath : undefined
     try {
       const currentClips = getValues(`${type === 'sound' ? 'sound' : 'ocf'}.clips`)
-      const customSchema = schema ?? null
       setLoadingOpen(true)
-      const res = await window.mainApi.getClips(type, currentClips, customSchema)
+      const params: GetClipsParams = {
+        type,
+        storedClips: currentClips ?? [],
+        customSchema: schema ?? null,
+        refreshPath: refreshPath ?? null
+      }
+      const res = await window.mainApi.getClips(params)
       if (res.success) {
         const { ocf, sound, proxy, custom } = res.clips
         if (!ocf && !sound && !proxy && !custom) {
           throw new Error('No valid clips found')
         }
-
-        if (res.paths.ocf) res.paths.ocf.forEach((p) => ocfPaths.current.add(p))
-        if (res.paths.sound) res.paths.sound.forEach((p) => soundPaths.current.add(p))
-        if (res.paths.proxy) proxyPaths.current.add(res.paths.proxy)
+        if (!refreshPath && res.paths && type !== 'custom') {
+          const paths = res.paths[type]
+          if (paths) {
+            paths.forEach((p: string) => addPathNonOverlapping(type, p))
+          }
+        }
 
         ocf && updateClips('ocf.clips', ocf)
         sound && updateClips('sound.clips', sound)
@@ -115,7 +117,12 @@ export const Import = ({ project, ocfPaths, soundPaths, proxyPaths }: ImportProp
   const handleRemoveClips = async (copy: CopyType, type: 'ocf' | 'sound'): Promise<void> => {
     try {
       const currentClips = getValues(`${type}.clips`)
-      const res = await window.mainApi.removeClips(copy.volumes, type, currentClips)
+      const params: RemoveClipsParams = {
+        paths: copy.volumes,
+        type,
+        storedClips: currentClips ?? []
+      }
+      const res = await window.mainApi.removeClips(params)
       if (res.success) {
         const { ocf, sound } = res.clips
         if (!ocf && !sound) {
@@ -124,23 +131,6 @@ export const Import = ({ project, ocfPaths, soundPaths, proxyPaths }: ImportProp
 
         ocf && updateClips('ocf.clips', ocf)
         sound && updateClips('sound.clips', sound)
-
-        if (type === 'ocf') {
-          for (const p of Array.from(ocfPaths.current)) {
-            const volumeName = getVolumeName(p)
-            if (copy.volumes.some((vol) => volumeName === vol)) {
-              ocfPaths.current.delete(p)
-            }
-          }
-        }
-        if (type === 'sound') {
-          for (const p of Array.from(soundPaths.current)) {
-            const volumeName = getVolumeName(p)
-            if (copy.volumes.some((vol) => volumeName === vol)) {
-              soundPaths.current.delete(p)
-            }
-          }
-        }
       } else {
         console.error(res.error)
       }
@@ -149,25 +139,42 @@ export const Import = ({ project, ocfPaths, soundPaths, proxyPaths }: ImportProp
     }
   }
 
-  const handleRemoveProxy = (): void => {
+  const handleRemovePath = (path: string, type: 'ocf' | 'sound' | 'proxy'): void => {
+    const currentPaths = getValues(`paths.${type}`)
+    const newPaths = currentPaths?.filter((p: string) => p !== path)
+    setValue(`paths.${type}`, newPaths)
+  }
+
+  const handleRemoveProxyClips = (): void => {
     updateClips('proxy.clips', [])
-    proxyPaths.current.clear()
   }
 
   return (
     <div className="space-y-16">
-      <Section label="Original Camera Files" type="ocf" handleAddClips={handleAddClips}>
-        <CopiesList type="ocf" handleRemoveCopy={handleRemoveClips} />
-      </Section>
-      <Section label="Sound" type="sound" handleAddClips={handleAddClips}>
-        <CopiesList type="sound" handleRemoveCopy={handleRemoveClips} />
-      </Section>
-      <Section label="Proxies" type="proxy" handleAddClips={handleAddClips}>
-        <Button size="sm" onClick={handleRemoveProxy} variant="destructive">
-          <X className="size-4" />
-          Clear
-        </Button>
-      </Section>
+      <Section
+        label="Original Camera Files"
+        type="ocf"
+        handleAddClips={handleAddClips}
+        handleRemoveCopy={handleRemoveClips}
+        handleRemovePath={handleRemovePath}
+        loadingOpen={loadingOpen}
+      />
+      <Section
+        label="Sound"
+        type="sound"
+        handleAddClips={handleAddClips}
+        handleRemoveCopy={handleRemoveClips}
+        handleRemovePath={handleRemovePath}
+        loadingOpen={loadingOpen}
+      />
+      <Section
+        label="Proxies"
+        type="proxy"
+        handleAddClips={handleAddClips}
+        handleRemoveProxyClips={handleRemoveProxyClips}
+        handleRemovePath={handleRemovePath}
+        loadingOpen={loadingOpen}
+      />
 
       {schemas?.map((schema) => (
         <CustomSection

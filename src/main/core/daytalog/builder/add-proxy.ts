@@ -7,7 +7,7 @@ import { getProxyMetadata } from '../../file-processing/proxies/proxy-metadata'
 const extensions = new Set(['.mov', '.mxf', '.mp4'])
 
 interface addProxyProps {
-  paths: string
+  paths: string[]
   storedClips: OcfClipType[]
 }
 
@@ -56,9 +56,17 @@ const getProxys = async (
 
 const addProxy = async ({ paths, storedClips }: addProxyProps): Promise<ResponseWithClips> => {
   try {
-    const directory = Array.isArray(paths) ? paths[0] : paths
     const store = new Map<string, OcfClipType>(storedClips.map((clip) => [clip.clip, clip]))
-    const proxys = await getProxys(directory, store)
+    const pathArray = Array.isArray(paths) ? paths : [paths]
+
+    const allProxies = await Promise.all(pathArray.map((directory) => getProxys(directory, store)))
+
+    const proxyMap = new Map<string, ProxyClipType>()
+    allProxies.flat().forEach((proxy) => {
+      proxyMap.set(proxy.clip, proxy)
+    })
+
+    const proxys = Array.from(proxyMap.values())
     if (proxys.length === 0) return { success: false, error: 'No matching proxies could be found' }
 
     return { success: true, clips: { proxy: proxys } }
