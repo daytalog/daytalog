@@ -89,15 +89,15 @@ async function createWindow(route: string = '/'): Promise<void> {
     return { action: 'deny' }
   })
 
-  let url: string
   if (is.dev && process.env.ELECTRON_RENDERER_URL) {
     // Dev server (e.g. http://localhost:3000/?initialRoute=/builder)
-    url = `${process.env.ELECTRON_RENDERER_URL}/core/?defaultRoute=${encodeURIComponent(route)}`
+    const url = `${process.env.ELECTRON_RENDERER_URL}/core/?defaultRoute=${encodeURIComponent(route)}`
+    mainWindow.loadURL(url)
   } else {
-    const fileURL = `file://${join(__dirname, '../renderer/index.html')}`
-    url = `${fileURL}?defaultRoute=${encodeURIComponent(route)}`
+    // Use loadFile instead of loadURL for proper path resolution in production
+    const htmlPath = join(__dirname, '../renderer/core/index.html')
+    mainWindow.loadFile(htmlPath, { query: { defaultRoute: route } })
   }
-  mainWindow.loadURL(url)
 }
 
 autoUpdater.on('download-progress', (progress) => {

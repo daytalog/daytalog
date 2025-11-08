@@ -40,7 +40,7 @@ export function createEditorWindow(): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     editorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/core/editor.html`)
   } else {
-    editorWindow.loadFile(join(__dirname, '../renderer/editor.html'))
+    editorWindow.loadFile(join(__dirname, '../renderer/core/editor.html'))
   }
 
   editorWindow.on('closed', () => {

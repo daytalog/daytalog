@@ -42,7 +42,7 @@ export function createSendWindow(selectedEmail: EmailType | null, selection?: st
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     sendWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/core/send.html`)
   } else {
-    sendWindow.loadFile(join(__dirname, '../renderer/send.html'))
+    sendWindow.loadFile(join(__dirname, '../renderer/core/send.html'))
   }
 
   sendWindow.on('closed', () => {

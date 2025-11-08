@@ -53,6 +53,6 @@ export function createErrorWindow(errorMessage?: string) {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     errorWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/core/error.html`)
   } else {
-    errorWindow.loadFile(join(__dirname, '../renderer/error.html'))
+    errorWindow.loadFile(join(__dirname, '../renderer/core/error.html'))
   }
 }

@@ -33,7 +33,7 @@ export function openOnboardWindow(): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     onboardWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/core/onboarding.html`)
   } else {
-    onboardWindow.loadFile(join(__dirname, '../renderer/onboarding.html'))
+    onboardWindow.loadFile(join(__dirname, '../renderer/core/onboarding.html'))
   }
 
   onboardWindow.once('ready-to-show', () => {
