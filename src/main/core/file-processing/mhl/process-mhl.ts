@@ -65,7 +65,6 @@ async function getValidMhlData(parsedXML: any): Promise<ValidationResult> {
 
   // Only if mhlClassic parsing fails, try ascMhl schema
   const ascMhlValidator = mhlAscZod.safeParse(parsedXML)
-
   if (ascMhlValidator.success) {
     return { success: true, data: ascMhlValidator.data, type: 'asc', error: null }
   }
@@ -98,10 +97,10 @@ async function processFile(
   try {
     const fileData = fs.readFileSync(filePath, 'utf8')
     const parsedXML = await parseXML(fileData)
-    const { success, data, type } = await getValidMhlData(parsedXML)
+    const { success, data, type, error } = await getValidMhlData(parsedXML)
 
     if (!success) {
-      const msg = 'Error parsing MHL file'
+      const msg = `Error parsing MHL file: ${error?.classicErrors?.message || error?.ascErrors?.message} | ${error.mhlInfo}`
       //logger.error(`${msg}:`, error)
       throw new Error(msg)
     }
@@ -117,9 +116,10 @@ async function processFile(
       ).filter((row) => extensions.some((ext) => row.file.toLowerCase().endsWith(ext)))
     } else if (type === 'asc') {
       //logger.debug('is ascmhl')
-      filteredFiles = (data as mhlAscType).hashlist.hashes.hash.filter((row) =>
-        extensions.some((ext) => row.path.text.toLowerCase().endsWith(ext))
-      )
+      filteredFiles =
+        (data as mhlAscType).hashlist.hashes?.hash?.filter((row) =>
+          extensions.some((ext) => row.path.text.toLowerCase().endsWith(ext))
+        ) ?? []
     }
 
     // First, extract raw names and detect numeric suffix patterns
@@ -172,7 +172,7 @@ async function processFile(
       const md5 = isClassic ? row.md5 : row.md5?.text
       const sha1 = isClassic ? row.sha1 : row.sha1?.text
       const xxhash64 = isClassic ? row.xxhash64 : row.xxh64?.text
-      const xxhash64be = isClassic ? row.xxhash64be : row.xxh64be?.text
+      const xxhash64be = isClassic ? row.xxhash64be : null
       const xxhash3 = isClassic ? null : row.xxh3?.text
       const xxhash128 = isClassic ? null : row.xxh128?.text
       const c4 = isClassic ? null : row.c4?.text
@@ -213,7 +213,7 @@ async function readAndParseMHLFiles(
   const updateProgress = (): void => {
     processedFiles++
     const progress = processedFiles / filePaths.length
-    progressCallback(progress) // Report progress
+    progressCallback(progress)
   }
   const extensions = type === 'ocf' ? AllowedVideoExt : AllowedSoundExt
 
@@ -227,7 +227,7 @@ async function readAndParseMHLFiles(
     })
   )
 
-  return results.flat() // Flatten the array of results
+  return results.flat()
 }
 
 async function processMHL(
@@ -236,28 +236,17 @@ async function processMHL(
   type: 'ocf' | 'sound'
 ): Promise<OcfClipBaseType[]> {
   let progress = 0
-  let showProgressFlag = false
 
   const progressCallback = (updatedProgress: number): void => {
     progress = updatedProgress
     console.log(`Current Progress: ${progress * 100}%`)
-    if (showProgressFlag) {
-      //mainWindow?.setProgressBar(progress)
-      //mainWindow?.webContents.send('show-progress', true, progress)
-    }
   }
 
   try {
-    //progressTimeout
-    const data = await readAndParseMHLFiles(mhlFiles, path, type, progressCallback)
-    //mainWindow.setProgressBar(-1) // Reset the progress bar
-    //mainWindow.webContents.send('show-progress', false, -1)
-    //clearTimeout(progressTimeout)
-    return data
+    return await readAndParseMHLFiles(mhlFiles, path, type, progressCallback)
   } catch (error) {
-    //clearTimeout(progressTimeout)
     console.error('Error processing MHL files:', error)
-    throw error // or handle it as needed
+    throw error
   }
 }
 

@@ -20,7 +20,14 @@ const hashFormatZod = z.object({
 // Define Path type with attributes
 const pathZod = z.object({
   text: z.string(),
-  size: z.string().transform((v) => parseInt(v, 10)),
+  size: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v) return 0
+      const parsed = parseInt(v, 10)
+      return isNaN(parsed) ? 0 : parsed
+    }),
   creationdate: z.string().optional(),
   lastmodificationdate: z.string().optional()
 })
@@ -34,13 +41,13 @@ const hashItemZod = z.object({
   xxh128: hashFormatZod.optional(),
   xxh3: hashFormatZod.optional(),
   xxh64: hashFormatZod.optional(),
-  xxh64be: hashFormatZod.optional(),
   previousPath: z.string().optional(),
   metadata: z.any().optional()
 })
 
 const hashesZod = z.object({
-  hash: z.array(hashItemZod)
+  hash: z.array(hashItemZod),
+  directoryhash: z.any().optional()
 })
 
 // Define HashList type with attribute
@@ -48,7 +55,7 @@ const hashListZod = z.object({
   version: z.string(),
   creatorinfo: anyNestedString.optional(),
   processinfo: anyNestedString.optional(),
-  hashes: hashesZod,
+  hashes: hashesZod.optional(),
   metadata: anyNestedString.optional(),
   references: anyNestedString.optional()
 })
