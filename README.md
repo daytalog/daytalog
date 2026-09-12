@@ -1,10 +1,13 @@
-# Daytalog Open Core
+# Daytalog Open Core V1 ARCHIVE
 
-Open-core repository of the **Daytalog** desktop app (Electron + Vite + React).
+Open-core repository of the Daytalog **Version 1** desktop app (Electron + Vite + React).
 
 > ⚠️ **Not for general use.**  
 > Download the official app from [daytalog.com](https://daytalog.com).  
 > This repository is for development only — some features are disabled or missing.
+
+> ⚠️ **Version 2.0 and beyond.**  
+> V2.0+ are heavily dependent on external SDKs and proprietary licenses, so it makes no sense to support an open-core model as of this date.
 
 ---
 
